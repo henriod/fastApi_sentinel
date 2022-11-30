@@ -133,7 +133,7 @@ async def get_ndvi_statistics(
 """
 Endpoint function to get ndvi statistics when provide with
 @start_date
-@End_date
+@end_date
 @Geojson feature as geojson file
 No Validation yet(check file extension, geojson geometries are valid, geojson geometry is either Polygon or multipolygon,crs is wgs84, etc)
 We are Using post method due to multipart form submission for security purposes
