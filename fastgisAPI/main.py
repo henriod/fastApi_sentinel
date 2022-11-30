@@ -105,7 +105,6 @@ async def get_ndvi_statistics(
             evalscript=ndvi_evalscript,
             time_interval=date_range,
             aggregation_interval="P1D",
-            resolution=(10, 10),
         )
 
         input_data = SentinelHubStatistical.input_data(DataCollection.SENTINEL2_L2A)
@@ -189,7 +188,6 @@ def get_ndvi_statistics_pst(
         evalscript=ndvi_evalscript,
         time_interval=yearly_time_interval,
         aggregation_interval="P1D",
-        resolution=(10, 10),
     )
 
     input_data = SentinelHubStatistical.input_data(DataCollection.SENTINEL2_L2A)
