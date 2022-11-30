@@ -15,6 +15,7 @@ from sentinelhub import (
 from config import config
 
 app = FastAPI()
+config.save()
 
 
 @app.get("/")
@@ -22,13 +23,23 @@ async def root():
     return {"message": "Hello World"}
 
 
+"""
+Endpoint function to get ndvi statistics when provide with
+@start_date
+@End_date
+@Geojson feature
+No Validation yet(check file extension, geojson geometries are valid, crs not wgs84, etc)
+We are using a get method here
+"""
+
+
 @app.get("/ndvi_statistical/")
-async def read_user(
-    start_datetime: date,
-    end_datetime: date,
+async def get_ndvi_statistics(
     file: UploadFile,
+    start_datetime: date = "2020-10-30",
+    end_datetime: date = "2020-12-10",
 ):
-    config.save()
+
     betsiboka_bbox = BBox([46.16, -16.15, 46.51, -15.58], CRS.WGS84)
 
     rgb_evalscript = """
@@ -90,16 +101,16 @@ Endpoint function to get ndvi statistics when provide with
 @start_date
 @End_date
 @Geojson file
-No Validation yet(check file extension, geojson geometries are valid, crs not wgs84, etc)
+No Validation yet(check file extension, geojson geometries are valid, geojson geometry is either Polygon or multipolygon,crs is wgs84, etc)
 We are Using post method due to multipart form submission for security purposes
 """
 
 
 @app.post("/ndvi_statistical/")
-def create_upload_file(
-    start_datetime: date,
-    end_datetime: date,
+def get_ndvi_statistics_pst(
     file: UploadFile,
+    start_datetime: date = "2020-05-30",
+    end_datetime: date = "2020-06-07",
 ):
     yearly_time_interval = start_datetime, end_datetime
     polygons_gdf = gpd.read_file(file.file)
@@ -153,14 +164,17 @@ def create_upload_file(
         }
     }
 
-    ndvi_requests = []
+    geo_shapes = []
 
     for geo_shape in polygons_gdf.geometry.values:
-        request = SentinelHubStatistical(
-            aggregation=aggregation,
-            input_data=[input_data],
-            geometry=Geometry(geo_shape, crs=CRS.WGS84),
-            calculations=histogram_calculations,
-            config=config,
-        )
+        geo_shapes.append(geo_shape)
+
+    # Only running for first geo_shape in the array
+    request = SentinelHubStatistical(
+        aggregation=aggregation,
+        input_data=[input_data],
+        geometry=Geometry(geo_shapes[0], crs=CRS.WGS84),
+        calculations=histogram_calculations,
+        config=config,
+    )
     return request.get_data()[0]
