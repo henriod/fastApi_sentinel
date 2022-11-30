@@ -1,7 +1,7 @@
 import geojson
 from geojson import Feature, Polygon, MultiPolygon
 import geopandas as gpd
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, HTTPException
 from datetime import date
 from sentinelhub import (
     CRS,
@@ -53,74 +53,81 @@ async def get_ndvi_statistics(
     end_datetime: date = "2020-12-10",
 ):
     # Load added string as geojson
-    geojson_object = geojson.loads(geojson_feature)
-    # Check if the data is a valid geojson
-    if geojson_object.is_valid:
-        # prepare a Geometry object to be used by sentinel hub librabry
-        feature = Geometry(geojson_object["geometry"], crs=CRS.WGS84)
-        date_range = start_datetime, end_datetime
-        ndvi_evalscript = """
-        //VERSION=3
+    try:
+        geojson_object = geojson.loads(geojson_feature)
+        # Check if the data is a valid geojson
+        if geojson_object.is_valid:
+            # prepare a Geometry object to be used by sentinel hub librabry
+            feature = Geometry(geojson_object["geometry"], crs=CRS.WGS84)
+            date_range = start_datetime, end_datetime
+            ndvi_evalscript = """
+            //VERSION=3
 
-        function setup() {
-        return {
-            input: [
-            {
-                bands: [
-                "B04",
-                "B08",
-                "dataMask"
+            function setup() {
+            return {
+                input: [
+                {
+                    bands: [
+                    "B04",
+                    "B08",
+                    "dataMask"
+                    ]
+                }
+                ],
+                output: [
+                {
+                    id: "ndvi",
+                    bands: 1
+                },
+                {
+                    id: "dataMask",
+                    bands: 1
+                }
                 ]
             }
-            ],
-            output: [
-            {
-                id: "ndvi",
-                bands: 1
-            },
-            {
-                id: "dataMask",
-                bands: 1
             }
-            ]
-        }
-        }
 
-        function evaluatePixel(samples) {
-            return {
-            ndvi: [index(samples.B08, samples.B04)],
-            dataMask: [samples.dataMask]
-            };
-        }
-        """
+            function evaluatePixel(samples) {
+                return {
+                ndvi: [index(samples.B08, samples.B04)],
+                dataMask: [samples.dataMask]
+                };
+            }
+            """
 
-        aggregation = SentinelHubStatistical.aggregation(
-            evalscript=ndvi_evalscript,
-            time_interval=date_range,
-            aggregation_interval="P1D",
-            resolution=(10, 10),
-        )
+            aggregation = SentinelHubStatistical.aggregation(
+                evalscript=ndvi_evalscript,
+                time_interval=date_range,
+                aggregation_interval="P1D",
+                resolution=(10, 10),
+            )
 
-        input_data = SentinelHubStatistical.input_data(DataCollection.SENTINEL2_L2A)
+            input_data = SentinelHubStatistical.input_data(DataCollection.SENTINEL2_L2A)
 
-        histogram_calculations = {
-            "ndvi": {
-                "histograms": {
-                    "default": {"nBins": 20, "lowEdge": -1.0, "highEdge": 1.0}
+            histogram_calculations = {
+                "ndvi": {
+                    "histograms": {
+                        "default": {"nBins": 20, "lowEdge": -1.0, "highEdge": 1.0}
+                    }
                 }
             }
-        }
 
-        request = SentinelHubStatistical(
-            aggregation=aggregation,
-            input_data=[input_data],
-            geometry=feature,
-            calculations=histogram_calculations,
-            config=config,
+            request = SentinelHubStatistical(
+                aggregation=aggregation,
+                input_data=[input_data],
+                geometry=feature,
+                calculations=histogram_calculations,
+                config=config,
+            )
+            rgb_stats = request.get_data()[0]
+            return rgb_stats
+        raise HTTPException(
+            status_code=404, detail="The Geojson Feature provide is invalid"
         )
-        rgb_stats = request.get_data()[0]
-
-    return rgb_stats
+    except:
+        raise HTTPException(
+            status_code=404, detail="The data could not be decoded to geojson"
+        )
 
 
 """
