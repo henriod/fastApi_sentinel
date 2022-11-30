@@ -3,6 +3,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, UploadFile
+from pydantic.types import Json
 from geojson import Polygon
 from datetime import date
 from sentinelhub import (
@@ -35,13 +36,13 @@ We are using a get method here
 
 @app.get("/ndvi_statistical/")
 async def get_ndvi_statistics(
-    file: UploadFile,
+    geojson_feature: Json,
     start_datetime: date = "2020-10-30",
     end_datetime: date = "2020-12-10",
 ):
 
     betsiboka_bbox = BBox([46.16, -16.15, 46.51, -15.58], CRS.WGS84)
-
+    feature = Geometry(geojson_feature, crs=CRS.WGS84)
     rgb_evalscript = """
     //VERSION=3
 
@@ -88,7 +89,7 @@ async def get_ndvi_statistics(
         input_data=[
             SentinelHubStatistical.input_data(DataCollection.SENTINEL2_L1C, maxcc=0.8)
         ],
-        bbox=betsiboka_bbox,
+        geometry=feature,
         config=config,
     )
     rgb_stats = rgb_request.get_data()[0]

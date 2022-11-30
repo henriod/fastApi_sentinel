@@ -1,6 +1,6 @@
 # FastAPI Function For NDVI statistics
 
-This a repo for testing my skill of integrating The sentinelhub Python package with FastAPI to get statistics from ndvi data
+This is a repo for testing my skills on integrating The sentinelhub Python package with FastAPI to get statistics from ndvi data
 
 ## Installation
 
