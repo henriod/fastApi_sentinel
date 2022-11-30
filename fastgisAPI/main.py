@@ -1,3 +1,4 @@
+import json
 import geojson
 from geojson import Feature, Polygon, MultiPolygon
 import geopandas as gpd
@@ -38,12 +39,13 @@ async def get_ndvi_statistics(
         "geometry": {
             "coordinates": [
                 [
-                    [12.779091544855845, 42.0539623314115],
-                    [12.777959229213792, 42.052661231622324],
-                    [12.779972804088118, 42.05126118804466],
-                    [12.781509884167576, 42.05193458240959],
-                    [12.781760652469302, 42.05393907756118],
-                    [12.779091544855845, 42.0539623314115],
+                    [74.068086, 18.33446],
+                    [74.069344, 18.338355],
+                    [74.067003, 18.338482],
+                    [74.064839, 18.337239],
+                    [74.064653, 18.336789],
+                    [74.06388, 18.335184],
+                    [74.068086, 18.33446],
                 ]
             ],
             "type": "Polygon",
@@ -56,78 +58,78 @@ async def get_ndvi_statistics(
     try:
         geojson_object = geojson.loads(geojson_feature)
         # Check if the data is a valid geojson
-        if geojson_object.is_valid:
-            # prepare a Geometry object to be used by sentinel hub librabry
-            feature = Geometry(geojson_object["geometry"], crs=CRS.WGS84)
-            date_range = start_datetime, end_datetime
-            ndvi_evalscript = """
-            //VERSION=3
-
-            function setup() {
-            return {
-                input: [
-                {
-                    bands: [
-                    "B04",
-                    "B08",
-                    "dataMask"
-                    ]
-                }
-                ],
-                output: [
-                {
-                    id: "ndvi",
-                    bands: 1
-                },
-                {
-                    id: "dataMask",
-                    bands: 1
-                }
-                ]
-            }
-            }
-
-            function evaluatePixel(samples) {
-                return {
-                ndvi: [index(samples.B08, samples.B04)],
-                dataMask: [samples.dataMask]
-                };
-            }
-            """
-
-            aggregation = SentinelHubStatistical.aggregation(
-                evalscript=ndvi_evalscript,
-                time_interval=date_range,
-                aggregation_interval="P1D",
-                resolution=(10, 10),
-            )
-
-            input_data = SentinelHubStatistical.input_data(DataCollection.SENTINEL2_L2A)
-
-            histogram_calculations = {
-                "ndvi": {
-                    "histograms": {
-                        "default": {"nBins": 20, "lowEdge": -1.0, "highEdge": 1.0}
-                    }
-                }
-            }
-
-            request = SentinelHubStatistical(
-                aggregation=aggregation,
-                input_data=[input_data],
-                geometry=feature,
-                calculations=histogram_calculations,
-                config=config,
-            )
-            rgb_stats = request.get_data()[0]
-            return rgb_stats
-        raise HTTPException(
-            status_code=404, detail="The Geojson Feature provide is invalid"
-        )
     except:
         raise HTTPException(
             status_code=404, detail="The data could not be decoded to geojson"
         )
+    if geojson_object.is_valid:
+        # prepare a Geometry object to be used by sentinel hub librabry
+        feature = Geometry(geojson_object["geometry"], crs=CRS.WGS84)
+        date_range = start_datetime, end_datetime
+        ndvi_evalscript = """
+        //VERSION=3
+
+        function setup() {
+        return {
+            input: [
+            {
+                bands: [
+                "B04",
+                "B08",
+                "dataMask"
+                ]
+            }
+            ],
+            output: [
+            {
+                id: "ndvi",
+                bands: 1
+            },
+            {
+                id: "dataMask",
+                bands: 1
+            }
+            ]
+        }
+        }
+
+        function evaluatePixel(samples) {
+            return {
+            ndvi: [index(samples.B08, samples.B04)],
+            dataMask: [samples.dataMask]
+            };
+        }
+        """
+
+        aggregation = SentinelHubStatistical.aggregation(
+            evalscript=ndvi_evalscript,
+            time_interval=date_range,
+            aggregation_interval="P1D",
+            resolution=(10, 10),
+        )
+
+        input_data = SentinelHubStatistical.input_data(DataCollection.SENTINEL2_L2A)
+
+        histogram_calculations = {
+            "ndvi": {
+                "histograms": {
+                    "default": {"nBins": 20, "lowEdge": -1.0, "highEdge": 1.0}
+                }
+            }
+        }
+
+        request = SentinelHubStatistical(
+            aggregation=aggregation,
+            input_data=[input_data],
+            geometry=feature,
+            calculations=histogram_calculations,
+            config=config,
+        )
+        rgb_stats = request.get_data()[0]
+        return rgb_stats
+    raise HTTPException(
+        status_code=404, detail="The Geojson Feature provide is invalid"
+    )
 
 
 """
