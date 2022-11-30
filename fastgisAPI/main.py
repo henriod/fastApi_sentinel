@@ -1,8 +1,7 @@
 import geojson
-from geojson import Feature
+from geojson import Feature, Polygon, MultiPolygon
 import geopandas as gpd
 from fastapi import FastAPI, UploadFile
-from pydantic.types import Json
 from datetime import date
 from sentinelhub import (
     CRS,
@@ -25,84 +24,101 @@ async def root():
 Endpoint function to get ndvi statistics when provide with
 @start_date
 @End_date
-@Geojson feature
-No Validation yet(check file extension, geojson geometries are valid, crs not wgs84, etc)
+@Geojson feature as string
+Validation check if the feature is valid before proceeding 
 We are using a get method here
 """
 
 
 @app.get("/ndvi_statistical/")
 async def get_ndvi_statistics(
-    geojson_feature: Json = {
-        "coordinates": [
-            [
-                [-84.41745612904897, 34.452770038887394],
-                [-84.41751612799544, 34.45029626726165],
-                [-84.4162561501181, 34.448490367707066],
-                [-84.41445618172189, 34.448713014968064],
-                [-84.41256621490591, 34.44863879928049],
-                [-84.40959626705205, 34.44866353785035],
-                [-84.40995626073158, 34.45281951357248],
-                [-84.41745612904897, 34.452770038887394],
-            ]
-        ],
-        "type": "Polygon",
+    geojson_feature: str = {
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+            "coordinates": [
+                [
+                    [12.779091544855845, 42.0539623314115],
+                    [12.777959229213792, 42.052661231622324],
+                    [12.779972804088118, 42.05126118804466],
+                    [12.781509884167576, 42.05193458240959],
+                    [12.781760652469302, 42.05393907756118],
+                    [12.779091544855845, 42.0539623314115],
+                ]
+            ],
+            "type": "Polygon",
+        },
     },
     start_datetime: date = "2020-10-30",
     end_datetime: date = "2020-12-10",
 ):
+    # Load added string as geojson
+    geojson_object = geojson.loads(geojson_feature)
+    # Check if the data is a valid geojson
+    if geojson_object.is_valid:
+        # prepare a Geometry object to be used by sentinel hub librabry
+        feature = Geometry(geojson_object["geometry"], crs=CRS.WGS84)
+        date_range = start_datetime, end_datetime
+        ndvi_evalscript = """
+        //VERSION=3
 
-    feature = Geometry(geojson_feature, crs=CRS.WGS84)
-    rgb_evalscript = """
-    //VERSION=3
-
-    function setup() {
-    return {
-        input: [
-        {
-            bands: [
-            "B02",
-            "B03",
-            "B04",
-            "dataMask"
+        function setup() {
+        return {
+            input: [
+            {
+                bands: [
+                "B04",
+                "B08",
+                "dataMask"
+                ]
+            }
+            ],
+            output: [
+            {
+                id: "ndvi",
+                bands: 1
+            },
+            {
+                id: "dataMask",
+                bands: 1
+            }
             ]
         }
-        ],
-        output: [
-        {
-            id: "rgb",
-            bands: ["R", "G", "B"]
-        },
-        {
-            id: "dataMask",
-            bands: 1
         }
-        ]
-    }
-    }
 
-    function evaluatePixel(samples) {
-        return {
-        rgb: [samples.B04, samples.B03, samples.B02],
-        dataMask: [samples.dataMask]
-        };
-    }
-    """
+        function evaluatePixel(samples) {
+            return {
+            ndvi: [index(samples.B08, samples.B04)],
+            dataMask: [samples.dataMask]
+            };
+        }
+        """
 
-    rgb_request = SentinelHubStatistical(
-        aggregation=SentinelHubStatistical.aggregation(
-            evalscript=rgb_evalscript,
-            time_interval=(start_datetime, end_datetime),
+        aggregation = SentinelHubStatistical.aggregation(
+            evalscript=ndvi_evalscript,
+            time_interval=date_range,
             aggregation_interval="P1D",
-            size=(631, 1047),
-        ),
-        input_data=[
-            SentinelHubStatistical.input_data(DataCollection.SENTINEL2_L1C, maxcc=0.8)
-        ],
-        geometry=feature,
-        config=config,
-    )
-    rgb_stats = rgb_request.get_data()[0]
+            resolution=(10, 10),
+        )
+
+        input_data = SentinelHubStatistical.input_data(DataCollection.SENTINEL2_L2A)
+
+        histogram_calculations = {
+            "ndvi": {
+                "histograms": {
+                    "default": {"nBins": 20, "lowEdge": -1.0, "highEdge": 1.0}
+                }
+            }
+        }
+
+        request = SentinelHubStatistical(
+            aggregation=aggregation,
+            input_data=[input_data],
+            geometry=feature,
+            calculations=histogram_calculations,
+            config=config,
+        )
+        rgb_stats = request.get_data()[0]
 
     return rgb_stats
 
@@ -111,7 +127,7 @@ async def get_ndvi_statistics(
 Endpoint function to get ndvi statistics when provide with
 @start_date
 @End_date
-@Geojson file
+@Geojson feature as geojson file
 No Validation yet(check file extension, geojson geometries are valid, geojson geometry is either Polygon or multipolygon,crs is wgs84, etc)
 We are Using post method due to multipart form submission for security purposes
 """
