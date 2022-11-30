@@ -1,14 +1,11 @@
 import geojson
+from geojson import Feature
 import geopandas as gpd
-import numpy as np
-import pandas as pd
 from fastapi import FastAPI, UploadFile
 from pydantic.types import Json
-from geojson import Polygon
 from datetime import date
 from sentinelhub import (
     CRS,
-    BBox,
     DataCollection,
     Geometry,
     SentinelHubStatistical,
@@ -36,12 +33,25 @@ We are using a get method here
 
 @app.get("/ndvi_statistical/")
 async def get_ndvi_statistics(
-    geojson_feature: Json,
+    geojson_feature: Json = {
+        "coordinates": [
+            [
+                [-84.41745612904897, 34.452770038887394],
+                [-84.41751612799544, 34.45029626726165],
+                [-84.4162561501181, 34.448490367707066],
+                [-84.41445618172189, 34.448713014968064],
+                [-84.41256621490591, 34.44863879928049],
+                [-84.40959626705205, 34.44866353785035],
+                [-84.40995626073158, 34.45281951357248],
+                [-84.41745612904897, 34.452770038887394],
+            ]
+        ],
+        "type": "Polygon",
+    },
     start_datetime: date = "2020-10-30",
     end_datetime: date = "2020-12-10",
 ):
 
-    betsiboka_bbox = BBox([46.16, -16.15, 46.51, -15.58], CRS.WGS84)
     feature = Geometry(geojson_feature, crs=CRS.WGS84)
     rgb_evalscript = """
     //VERSION=3
