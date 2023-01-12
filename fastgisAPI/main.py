@@ -4,16 +4,15 @@ from geojson import Feature, Polygon, MultiPolygon
 import geopandas as gpd
 from fastapi import FastAPI, UploadFile, HTTPException
 from datetime import date
-from sentinelhub import (
-    CRS,
-    DataCollection,
-    Geometry,
-    SentinelHubStatistical,
-)
+from sentinelhub import CRS, DataCollection, Geometry, SentinelHubStatistical, BBox
 from config import config
 
 app = FastAPI()
 config.save()
+if config.sh_client_id == "" or config.sh_client_secret == "":
+    print(
+        "Warning! To use Sentinel Hub services, please provide the credentials (client ID and client secret)."
+    )
 
 
 @app.get("/")
@@ -55,6 +54,13 @@ async def get_ndvi_statistics(
     end_datetime: date = "2020-12-10",
 ):
     # Load added string as geojson
+    bbox = BBox(
+        [
+            [36.398822317698006, -0.6942581416901561],
+            [36.407679926367024, -0.6942581416901561],
+        ],
+        crs=CRS.WGS84,
+    )
     try:
         geojson_object = geojson.loads(geojson_feature)
         # Check if the data is a valid geojson

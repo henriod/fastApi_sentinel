@@ -1,13 +1,19 @@
 from fastapi import FastAPI
-from sentinelhub import WmsRequest, MimeType, CRS, BBox
+from sentinelhub import WmsRequest, MimeType, CRS, BBox, BBoxCollection
+from config import config
 
 app = FastAPI()
+config.save()
+if config.sh_client_id == "" or config.sh_client_secret == "":
+    print(
+        "Warning! To use Sentinel Hub services, please provide the credentials (client ID and client secret)."
+    )
 
 
 @app.post("/ndvi")
 def get_ndvi(
-    start_date: str,
-    end_date: str,
+    start_date: str = "2020-10-30",
+    end_date: str = "2020-12-10",
     feature: dict = {
         "type": "Feature",
         "properties": {},
@@ -25,7 +31,14 @@ def get_ndvi(
         },
     },
 ):
-    bbox = BBox(feature["geometry"]["coordinates"], crs=CRS.WGS84)
+    print(feature["geometry"]["coordinates"][0])
+    bbox = BBox(
+        [
+            [36.398822317698006, -0.6942581416901561],
+            [36.407679926367024, -0.6942581416901561],
+        ],
+        crs=CRS.WGS84,
+    )
     wms_request = WmsRequest(
         layer="TRUE-COLOR-S2-L1C",
         bbox=bbox,
